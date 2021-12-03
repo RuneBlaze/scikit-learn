@@ -86,6 +86,7 @@ SPARSE_SPLITTERS = {
 
 
 class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
+    
     """Base class for decision trees.
 
     Warning: This class should not be used directly.
@@ -121,6 +122,9 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
         self.min_impurity_decrease = min_impurity_decrease
         self.class_weight = class_weight
         self.ccp_alpha = ccp_alpha
+
+        self.use_bias = False
+        self.bias = None
 
     def get_depth(self):
         """Return the depth of the decision tree.
@@ -373,6 +377,11 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
                 min_weight_leaf,
                 random_state,
             )
+            # print("making splitters")
+            if self.use_bias:
+                # print("using bias!")
+                splitter.bias = self.bias
+                splitter.use_bias = self.use_bias
 
         if is_classifier(self):
             self.tree_ = Tree(self.n_features_in_, self.n_classes_, self.n_outputs_)

@@ -98,6 +98,9 @@ def clone(estimator, *, safe=True):
                 "Cannot clone object %s, as the constructor "
                 "either does not set or modifies parameter %s" % (estimator, name)
             )
+    if hasattr(estimator, "use_bias"):
+        new_object.use_bias = estimator.use_bias
+        new_object.bias = estimator.bias
     return new_object
 
 

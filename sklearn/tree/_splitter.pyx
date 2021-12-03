@@ -17,6 +17,7 @@ from libc.stdlib cimport free
 from libc.stdlib cimport qsort
 from libc.string cimport memcpy
 from libc.string cimport memset
+from libc.stdio cimport printf
 
 import numpy as np
 cimport numpy as np
@@ -252,6 +253,8 @@ cdef class BaseDenseSplitter(Splitter):
 
 
 cdef class BestSplitter(BaseDenseSplitter):
+    cdef public bint use_bias
+    cdef public np.float64_t[:] bias
     """Splitter for finding the best split."""
     def __reduce__(self):
         return (BestSplitter, (self.criterion,
@@ -304,6 +307,8 @@ cdef class BestSplitter(BaseDenseSplitter):
         cdef SIZE_t n_total_constants = n_known_constants
         cdef DTYPE_t current_feature_value
         cdef SIZE_t partition_end
+
+        cdef bint skip_constant = not self.use_bias
 
         _init_split(&best, end)
 
@@ -360,7 +365,7 @@ cdef class BestSplitter(BaseDenseSplitter):
 
                 sort(Xf + start, samples + start, end - start)
 
-                if Xf[end - 1] <= Xf[start] + FEATURE_THRESHOLD:
+                if Xf[end - 1] <= Xf[start] + FEATURE_THRESHOLD and not skip_constant:
                     features[f_j], features[n_total_constants] = features[n_total_constants], features[f_j]
 
                     n_found_constants += 1
@@ -376,7 +381,7 @@ cdef class BestSplitter(BaseDenseSplitter):
 
                     while p < end:
                         while (p + 1 < end and
-                               Xf[p + 1] <= Xf[p] + FEATURE_THRESHOLD):
+                               Xf[p + 1] <= Xf[p] + FEATURE_THRESHOLD and not skip_constant):
                             p += 1
 
                         # (p + 1 >= end) or (X[samples[p + 1], current.feature] >
@@ -401,7 +406,11 @@ cdef class BestSplitter(BaseDenseSplitter):
                                 continue
 
                             current_proxy_improvement = self.criterion.proxy_impurity_improvement()
-
+                            # printf("%d, ", self.use_bias)
+                            if self.use_bias:
+                                current_proxy_improvement += self.bias[current.feature]
+                                # printf("%f\t%d ; ", self.bias[current.feature], current.feature)
+                            
                             if current_proxy_improvement > best_proxy_improvement:
                                 best_proxy_improvement = current_proxy_improvement
                                 # sum of halves is used to avoid infinite value
@@ -434,6 +443,8 @@ cdef class BestSplitter(BaseDenseSplitter):
                                              &best.impurity_right)
             best.improvement = self.criterion.impurity_improvement(
                 impurity, best.impurity_left, best.impurity_right)
+            if self.use_bias:
+                best.improvement += self.bias[best.feature]
 
         # Respect invariant for constant features: the original order of
         # element in features[:n_known_constants] must be preserved for sibling
